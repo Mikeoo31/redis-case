@@ -4,6 +4,7 @@ import cn.hutool.core.util.IdUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -52,7 +53,7 @@ public class DistributedLock implements Lock {
                             "return 0 " +
                     "end";
 
-            while(Boolean.FALSE.equals(stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), List.of(lockName), threadUUID, expireTime))){
+            while(!stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Arrays.asList(lockName), threadUUID, String.valueOf(expireTime))){
                 try {
                     TimeUnit.MILLISECONDS.sleep(20);
                 }catch (InterruptedException e) {
@@ -67,18 +68,22 @@ public class DistributedLock implements Lock {
     @Override
     public void unlock() {
         String script =
-                "if redis.call('hexists', KEYS[1], ARVG[1]) == 0 then " +
-                        "return nil " +
-                "elseif redis.call('hincrby', KEYS[1], ARVG[1],-1) == 0 then " +
-                        "redis.call('del', KEYS[1]) " +
-                "else " +
-                        "return 0 " +
-                "end";
+                "if redis.call('hexists',KEYS[1],ARGV[1]) == 0 then " +
+                        "   return 0 " +
+                        "elseif redis.call('hincrby',KEYS[1],ARGV[1],-1) == 0 then " +
+                        "   return redis.call('del',KEYS[1]) " +
+                        "else " +
+                        "   return 0 " +
+                        "end";
 
-        Long result = stringRedisTemplate.execute(new DefaultRedisScript<>(script, Long.class), List.of(lockName), threadUUID);
+        Long flag = stringRedisTemplate.execute(
+                new DefaultRedisScript<>(script, Long.class),
+                Arrays.asList(lockName),
+                threadUUID
+        );
 
-        if(result == null){
-            throw new IllegalMonitorStateException("The current thread does not hold this lock");
+        if (flag == null || flag == 0) {
+            throw new RuntimeException("this thread does not hold the lock");
         }
     }
 
