@@ -1,0 +1,22 @@
+server:
+  port: 8001
+
+spring:
+  application:
+    name: red-packet
+
+  #redis配置
+  data:
+    redis:
+      database: 0
+      #host: 192.168.88.135
+      host: 192.168.200.128
+      port: 6379
+      password: 2003
+
+
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
