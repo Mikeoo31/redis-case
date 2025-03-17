@@ -27,6 +27,9 @@ public class InventoryService {
     @Autowired
     private DistributedLockFactory distributedLockFactory;
 
+    /**
+     * 使用工厂模式，创建分布式可重入锁
+     */
     public String getInventory() {
         String retResult = "";
         Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");
@@ -38,6 +41,7 @@ public class InventoryService {
                 redisTemplate.opsForValue().set("inventory001", String.valueOf(--inventoryNum));
                 retResult = port + " " + "库存减少成功，剩余库存：" + inventoryNum;
                 System.out.println(port + " " + "库存扣减成功,剩余库存：" + inventoryNum);
+                testReentrantLock();
             }else {
                 retResult = "库存不足";
                 System.out.println(port + " " + "库存不足");
@@ -46,6 +50,19 @@ public class InventoryService {
             redisDistributedLock.unlock();
         }
         return retResult;
+    }
+
+    /**
+     * 测试可重入锁
+     */
+    private void testReentrantLock() {
+        Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");
+        redisDistributedLock.lock();
+        try {
+            System.out.println("========testReentrantLock=========");
+        } finally {
+            redisDistributedLock.unlock();
+        }
     }
 
 
@@ -74,7 +91,6 @@ public class InventoryService {
         }
         return retResult;
     }*/
-
 
     /**
      * 分布式锁的第一种实现方式：基于Redis的setnx命令，设置一个key，并设置超时时间，保证原子性，

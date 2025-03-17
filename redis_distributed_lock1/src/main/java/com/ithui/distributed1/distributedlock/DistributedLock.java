@@ -1,11 +1,9 @@
 package com.ithui.distributed1.distributedlock;
 
-import cn.hutool.core.util.IdUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -18,11 +16,18 @@ public class DistributedLock implements Lock {
     private String threadUUID;// 当前线程的UUID==>ARGV[1]
     private long expireTime; // 锁的过期时间==>ARGV[2]
 
-    public DistributedLock(StringRedisTemplate stringRedisTemplate, String lockName){
+//    public DistributedLock(StringRedisTemplate stringRedisTemplate, String lockName){
+//        this.stringRedisTemplate = stringRedisTemplate;
+//        this.lockName = lockName;
+//        this.threadUUID = IdUtil.simpleUUID() + Thread.currentThread().getId();
+//        this.expireTime = 50; // 默认50秒过期时间
+//    }
+
+    public DistributedLock(StringRedisTemplate stringRedisTemplate, String lockName,String uuid){
         this.stringRedisTemplate = stringRedisTemplate;
         this.lockName = lockName;
-        this.threadUUID = IdUtil.simpleUUID() + Thread.currentThread().getId();
-        this.expireTime = 50; // 默认50秒过期时间
+        this.threadUUID = uuid + ":" + Thread.currentThread().getId();
+        this.expireTime = 25; // 默认50秒过期时间
     }
 
     @Override
@@ -52,7 +57,7 @@ public class DistributedLock implements Lock {
                     "else " +
                             "return 0 " +
                     "end";
-
+            System.out.println("lock: " + lockName + " -----> " + threadUUID);
             while(!stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Arrays.asList(lockName), threadUUID, String.valueOf(expireTime))){
                 try {
                     TimeUnit.MILLISECONDS.sleep(20);
@@ -67,13 +72,19 @@ public class DistributedLock implements Lock {
 
     @Override
     public void unlock() {
+        System.out.println("unlock: " + lockName + " -----> " + threadUUID);
         String script =
-                "if redis.call('hexists',KEYS[1],ARGV[1]) == 0 then " +
-                        "   return 0 " +
-                        "elseif redis.call('hincrby',KEYS[1],ARGV[1],-1) == 0 then " +
-                        "   return redis.call('del',KEYS[1]) " +
-                        "else " +
-                        "   return 0 " +
+                "local exists = redis.call('hexists', KEYS[1], ARGV[1])\n" +
+                        "if exists == 0 then\n" +
+                        "    return 0\n" +
+                        "else\n" +
+                        "    local count = redis.call('hincrby', KEYS[1], ARGV[1], -1)\n" +
+                        "    if count == 0 then\n" +
+                        "        redis.call('del', KEYS[1])\n" +
+                        "        return 1\n" +
+                        "    else\n" +
+                        "        return 2\n" +
+                        "    end\n" +
                         "end";
 
         Long flag = stringRedisTemplate.execute(
