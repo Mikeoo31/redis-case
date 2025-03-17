@@ -4,9 +4,12 @@ import cn.hutool.core.lang.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -20,11 +23,51 @@ public class InventoryService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-
+    /**
+     * 分布式锁的第一种实现方式：基于Redis的setnx命令，设置一个key，并设置超时时间，保证原子性，
+     * 同时，在删除锁之前，判断是否是自己的锁，防止其他线程删除自己的锁。这已经可以满足大部分场景，但还有一些问题需要解决。
+     * 问题：如何设置可重入锁，保证线程安全。
+     */
+    /*
+    public String getInventory() {
+        String retResult = "";
+        // 集群版的锁
+        String lockKey = "inventory_lock";
+        String value = UUID.randomUUID().toString() + Thread.currentThread().getId();
+        // 保证加锁和设置超时时间的原子性
+        while (!redisTemplate.opsForValue().setIfAbsent(lockKey, value, 10, TimeUnit.SECONDS)) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(20);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        try {
+            String inventory = redisTemplate.opsForValue().get("inventory001");
+            Integer inventoryNum = inventory == null ? 0 : Integer.parseInt(inventory);
+            if(inventoryNum > 0){
+                redisTemplate.opsForValue().set("inventory001", String.valueOf(--inventoryNum));
+                retResult = port + " " + "库存减少成功，剩余库存：" + inventoryNum;
+                System.out.println(port + " " + "库存扣减成功,剩余库存：" + inventoryNum);
+            }else {
+                retResult = "库存不足";
+                System.out.println(port + " " + "库存不足");
+            }
+        } finally {
+            // 改进：保证删除锁的原子性
+            String evalStr = "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+                    "return redis.call('del', KEYS[1]) " +
+                    "else return 0 " +
+                    "end";
+            redisTemplate.execute(new DefaultRedisScript<>(evalStr, Boolean.class), Arrays.asList(lockKey), value);
+        }
+        return retResult;
+    }*/
 
     /**
      * 分布式锁的进阶：基于Redis的setnx命令，设置一个key，并设置超时时间，保证原子性。
      * 同时，在删除锁之前，判断是否是自己的锁，防止其他线程删除自己的锁。
+     * 问题：判断是否是自己的锁市，并不能完全保证原子性。
      */
     /*
     public String getInventory() {
@@ -64,7 +107,6 @@ public class InventoryService {
      * 分布式锁的第一种实现方式：基于Redis的setnx命令，设置一个key，并设置超时时间，保证原子性。
      */
     /*
-
     public String getInventory() {
         String retResult = "";
         // 集群版的锁
