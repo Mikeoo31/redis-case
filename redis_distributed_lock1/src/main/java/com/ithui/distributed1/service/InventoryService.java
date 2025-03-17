@@ -1,6 +1,7 @@
 package com.ithui.distributed1.service;
 
 import cn.hutool.core.lang.UUID;
+import com.ithui.distributed1.distributedlock.DistributedLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,6 +23,30 @@ public class InventoryService {
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    private Lock distributedLock = new DistributedLock(redisTemplate, "inventory_lock");
+
+    public String getInventory() {
+        String retResult = "";
+        // 单机版的锁
+        distributedLock.lock();
+        try {
+            String inventory = redisTemplate.opsForValue().get("inventory001");
+            Integer inventoryNum = inventory == null? 0 : Integer.parseInt(inventory);
+            if(inventoryNum > 0){
+                redisTemplate.opsForValue().set("inventory001", String.valueOf(--inventoryNum));
+                retResult = port + " " + "库存减少成功，剩余库存：" + inventoryNum;
+                System.out.println(port + " " + "库存扣减成功,剩余库存：" + inventoryNum);
+            }else {
+                retResult = "库存不足";
+                System.out.println(port + " " + "库存不足");
+            }
+        } finally {
+            distributedLock.unlock();
+        }
+        return retResult;
+    }
+
 
     /**
      * 分布式锁的第一种实现方式：基于Redis的setnx命令，设置一个key，并设置超时时间，保证原子性，
