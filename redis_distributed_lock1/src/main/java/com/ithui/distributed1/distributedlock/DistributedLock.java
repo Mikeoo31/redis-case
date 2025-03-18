@@ -4,6 +4,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -65,10 +67,13 @@ public class DistributedLock implements Lock {
                     e.printStackTrace();
                 }
             }
+            // 加锁成功，并实现自动续期
+            this.resetExpireTime();
             return true;
         }
         return false;
     }
+
 
     @Override
     public void unlock() {
@@ -96,6 +101,25 @@ public class DistributedLock implements Lock {
         if (flag == null || flag == 0) {
             throw new RuntimeException("this thread does not hold the lock");
         }
+    }
+
+    // 自动续期
+    private void resetExpireTime() {
+        String script =
+                "if redis.call('hexists', KEYS[1], ARGV[1]) == 1 then " +
+                        "return redis.call('expire', KEYS[1], ARGV[2])" +
+                "else " +
+                        "return 0 " +
+                "end";
+        // 每隔 expireTime/3 秒执行一次自动续期
+        new Timer().schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if(stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Arrays.asList(lockName), threadUUID, String.valueOf(expireTime))){
+                    resetExpireTime();
+                }
+            }
+        }, expireTime * 1000 / 3);
     }
 
     // 暂时用不到

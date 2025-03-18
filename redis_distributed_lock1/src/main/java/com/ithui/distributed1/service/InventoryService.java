@@ -1,20 +1,13 @@
 package com.ithui.distributed1.service;
 
-import cn.hutool.core.lang.UUID;
-import com.ithui.distributed1.distributedlock.DistributedLock;
 import com.ithui.distributed1.distributedlock.DistributedLockFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
-
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class InventoryService {
@@ -27,9 +20,36 @@ public class InventoryService {
     @Autowired
     private DistributedLockFactory distributedLockFactory;
 
+    public String getInventory() {
+        String retResult = "";
+        Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");
+        redisDistributedLock.lock();
+        try {
+            String inventory = redisTemplate.opsForValue().get("inventory001");
+            Integer inventoryNum = inventory == null? 0 : Integer.parseInt(inventory);
+            if(inventoryNum > 0){
+                redisTemplate.opsForValue().set("inventory001", String.valueOf(--inventoryNum));
+                retResult = port + " " + "库存减少成功，剩余库存：" + inventoryNum;
+                System.out.println(port + " " + "库存扣减成功,剩余库存：" + inventoryNum);
+                // 演示分布式锁续期
+                TimeUnit.SECONDS.sleep(120);
+            }else {
+                retResult = "库存不足";
+                System.out.println(port + " " + "库存不足");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            redisDistributedLock.unlock();
+        }
+        return retResult;
+    }
+
+
     /**
      * 使用工厂模式，创建分布式可重入锁
      */
+    /*
     public String getInventory() {
         String retResult = "";
         Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");
@@ -50,11 +70,12 @@ public class InventoryService {
             redisDistributedLock.unlock();
         }
         return retResult;
-    }
+    }*/
 
     /**
      * 测试可重入锁
      */
+    /*
     private void testReentrantLock() {
         Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");
         redisDistributedLock.lock();
@@ -63,8 +84,7 @@ public class InventoryService {
         } finally {
             redisDistributedLock.unlock();
         }
-    }
-
+    }*/
 
     /**
      * 使用hset实现分布式的可重入锁
