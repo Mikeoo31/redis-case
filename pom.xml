@@ -12,6 +12,7 @@
         <module>red-packet</module>
         <module>redis_distributed_lock1</module>
         <module>redis_distributed_lock2</module>
+        <module>redis_redlock</module>
     </modules>
 
     <properties>

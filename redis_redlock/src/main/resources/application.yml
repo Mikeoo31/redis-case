@@ -1,0 +1,26 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: redis-redlock-service
+
+  data:
+    redis:
+      database: 0
+      timeout: 3000
+
+
+
+  redis:
+    pool:
+      conn-timeout: 3000
+      so-timeout: 3000
+      size: 10
+    single:
+      address1: 192.168.200.128:6381
+      address2: 192.168.200.128:6382
+      address3: 192.168.200.128:6383
+
+
+

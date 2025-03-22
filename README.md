@@ -173,3 +173,13 @@ public Lock getDistributedLock(String typeName) {
 - 自研分布式锁，就必须满足JUC的Lock规范之一：可重入性
 - 添加定时任务，实现锁的自动续期，这样可以防止锁的过期，提高系统的稳定性
 - 扩展性：可以根据需求，选择不同的锁类型，来实现不同的功能。
+
+
+## redisson分布式锁
+- Redisson是一个基于Redis的Java客户端，实现了分布式锁，提供了多种分布式锁的实现方式，包括单节点锁，基于Redlock算法的锁。
+- Redisson的分布式锁，可以实现可重入性，并且提供了锁的自动续期功能。底层的实现原理也是基于Redis的hset命令，并配合lua脚本实现的。
+
+详见官网：[https://redisson.pro/docs/overview/](https://redisson.pro/docs/overview/)
+
+### redis分布式锁-redlock算法
+- 基于多个节点实例实现的分布式锁，且每个节点都是master节点（舍弃了异步复制的特性），锁的变量由多个实例共同维护，即使其中一个节点宕机，也能保证锁的可用性。
