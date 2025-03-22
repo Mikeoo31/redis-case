@@ -1,6 +1,8 @@
 package com.ithui.distributed1.service;
 
 import com.ithui.distributed1.distributedlock.DistributedLockFactory;
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,6 +22,41 @@ public class InventoryService {
     @Autowired
     private DistributedLockFactory distributedLockFactory;
 
+    @Autowired
+    private Redisson redisson;
+
+    /**
+     * 使用redisson实现分布式锁
+     */
+    public String getInventoryByRedisson() {
+        String retResult = "";
+        RLock redissonLock = redisson.getLock("redisLock");
+        redissonLock.lock();
+        try {
+            String inventory = redisTemplate.opsForValue().get("inventory001");
+            Integer inventoryNum = inventory == null? 0 : Integer.parseInt(inventory);
+            if(inventoryNum > 0){
+                redisTemplate.opsForValue().set("inventory001", String.valueOf(--inventoryNum));
+                retResult = port + " " + "库存减少成功，剩余库存：" + inventoryNum;
+                System.out.println(port + " " + "库存扣减成功,剩余库存：" + inventoryNum);
+            }else {
+                retResult = "库存不足";
+                System.out.println(port + " " + "库存不足");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // 释放锁之前需要判断是否是自己的锁，否则可能会报错
+            if(redissonLock.isLocked() && redissonLock.isHeldByCurrentThread()){
+                redissonLock.unlock();
+            }
+        }
+        return retResult;
+    }
+
+    /**
+     * 分布式锁的自动续期
+     */
     public String getInventory() {
         String retResult = "";
         Lock redisDistributedLock = distributedLockFactory.getDistributedLock("redis");

@@ -17,4 +17,9 @@ public class InventoryController {
     public String getInventory() {
         return inventoryService.getInventory();
     }
+
+    @GetMapping("/inventoryByRedisson")
+    public String getInventoryByRedisson() {
+        return inventoryService.getInventoryByRedisson();
+    }
 }
